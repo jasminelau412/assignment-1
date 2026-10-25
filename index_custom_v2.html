@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="initial-scale=1,width=device-width">
+<title>1992 Archive Photo Map</title>
+<link rel="stylesheet" href="css/leaflet.css">
+<link rel="stylesheet" href="css/MarkerCluster.css">
+<link rel="stylesheet" href="css/MarkerCluster.Default.css">
+<style>
+:root {
+  --bg: #f5f4f0;
+  --panel: #ffffff;
+  --border: #d8d4cc;
+  --accent: #b03a2e;
+  --text: #2c2a26;
+  --muted: #6b675f;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: "Noto Serif TC", "Microsoft JhengHei", "PingFang TC", serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+header {
+  background: var(--accent);
+  color: #fff;
+  padding: 10px 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+header h1 { font-size: 17px; font-weight: 600; letter-spacing: .5px; }
+#record-count {
+  font-size: 13px;
+  background: rgba(255,255,255,.18);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+#app {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 270px 1fr 330px;
+  gap: 10px;
+  padding: 10px;
+  min-height: 0;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow-y: auto;
+  min-height: 0;
+  min-width: 0;
+}
+.panel h2 {
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  text-transform: uppercase;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--border);
+}
+/* ---- filters ---- */
+.filter-group { padding: 8px 12px; border-bottom: 1px dashed var(--border); }
+.filter-group:last-child { border-bottom: none; }
+.filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.filter-head .name { font-size: 14px; font-weight: 600; }
+.filter-head .btns button {
+  font-size: 11px;
+  padding: 1px 7px;
+  margin-left: 4px;
+  border: 1px solid var(--border);
+  background: #faf9f6;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text);
+}
+.filter-head .btns button:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+.filter-options { max-height: 150px; overflow-y: auto; }
+.filter-options label {
+  display: block;
+  font-size: 13px;
+  padding: 2px 2px;
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.filter-options label:hover { background: #f2efe9; }
+.filter-options input { margin-right: 6px; accent-color: var(--accent); }
+.filter-options .opt-count { color: var(--muted); font-size: 11px; margin-left: 4px; }
+/* ---- raster layer toggle ---- */
+.layer-toggle label {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  padding: 3px 2px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.layer-toggle label:hover { background: #f2efe9; }
+.layer-toggle input { margin-right: 6px; accent-color: var(--accent); }
+.layer-fixed {
+  font-size: 13px;
+  padding: 3px 2px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+}
+.layer-fixed .pin {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #9aa0a6;
+  border-radius: 2px;
+  margin-right: 8px;
+  background: #9aa0a6;
+}
+/* ---- map ---- */
+#map { min-height: 320px; border-radius: 6px; z-index: 1; }
+/* ---- detail ---- */
+#detail-body { padding: 12px; }
+#detail-placeholder { color: var(--muted); font-size: 13px; line-height: 1.7; padding: 12px; }
+#detail-photo-wrap { text-align: center; margin-bottom: 10px; }
+#detail-photo-wrap img {
+  max-width: 100%;
+  max-height: 300px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.15);
+}
+.meta-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.meta-table th {
+  text-align: left;
+  vertical-align: top;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 4px 8px 4px 0;
+  white-space: nowrap;
+  width: 96px;
+  border-bottom: 1px dashed var(--border);
+}
+.meta-table td { padding: 4px 0; line-height: 1.55; border-bottom: 1px dashed var(--border); }
+.meta-table tr:last-child th, .meta-table tr:last-child td { border-bottom: none; }
+/* ---- responsive ---- */
+@media (max-width: 1100px) {
+  #app { grid-template-columns: 230px 1fr; grid-template-rows: 55vh auto; }
+  #map { grid-column: 2; grid-row: 1; }
+  #filters { grid-column: 1; grid-row: 1 / span 2; }
+  #detail { grid-column: 2; grid-row: 2; max-height: 45vh; }
+}
+@media (max-width: 700px) {
+  #app { grid-template-columns: 1fr; grid-template-rows: auto 52vh auto; }
+  #map { grid-column: 1; grid-row: 2; }
+  #filters { grid-column: 1; grid-row: 1; max-height: 40vh; }
+  #detail { grid-column: 1; grid-row: 3; max-height: 50vh; }
+  .filter-head { flex-wrap: wrap; gap: 4px; }
+  .filter-head .name { flex: 1 1 100%; }
+  body { overflow-x: hidden; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>1992 Archive Photo Map</h1>
+  <span id="record-count"></span>
+</header>
+<div id="app">
+  <aside id="filters" class="panel"><h2>Filters &amp; Layers</h2><div id="filter-groups"></div></aside>
+  <main id="map"></main>
+  <aside id="detail" class="panel">
+    <h2>Photograph &amp; Metadata</h2>
+    <div id="detail-placeholder">點選地圖上的照片 marker，照片與後設資料會顯示在這裡。</div>
+    <div id="detail-body" style="display:none">
+      <div id="detail-photo-wrap"><img id="detail-photo" alt="photograph"></div>
+      <table class="meta-table"><tbody id="detail-meta"></tbody></table>
+    </div>
+  </aside>
+</div>
+<script src="js/leaflet.js"></script>
+<script src="js/leaflet.markercluster.js"></script>
+<script src="data/Photos_2.js"></script>
+<script>
+(function () {
+    'use strict';
+    var FEATURES = json_Photos_2.features;
+    var FIELDS = ['Photo ID', 'Date', 'Place', 'Subject', 'Location precision', 'Notes'];
+    var FILTER_FIELDS = ['Place', 'Subject', 'Location precision'];
+
+    function photoFile(p) {
+        return 'images/' + String(p).replace(/[\\/:]/g, '_').trim();
+    }
+
+    // ---------- map: same bounds as index.html ----------
+    var map = L.map('map', { zoomControl: true, maxZoom: 28, minZoom: 1 })
+        .fitBounds([[22.276342109568045, 113.93368533938072], [22.279310690186403, 113.93921057087853]]);
+
+    // ---------- 兩層獨立 raster ----------
+    // iB5000 Map：底層，固定顯示，不提供開關
+    map.createPane('pane_iB5000Map_0');
+    map.getPane('pane_iB5000Map_0').style.zIndex = 400;
+    L.imageOverlay('data/iB5000Map_0.png',
+        [[22.27366640132881, 113.93408524462212], [22.300808410150857, 113.9705172786357]],
+        { pane: 'pane_iB5000Map_0' }).addTo(map);
+
+    // 1992 Map：獨立圖層，可由左欄開關
+    map.createPane('pane_1992Map_1');
+    map.getPane('pane_1992Map_1').style.zIndex = 401;
+    var layer_1992Map = L.imageOverlay('data/1992Map_1.png',
+        [[22.27540212889551, 113.93329248243768], [22.27973727608616, 113.93914231961061]],
+        { pane: 'pane_1992Map_1' }).addTo(map);
+
+    map.createPane('pane_Photos');
+    map.getPane('pane_Photos').style.zIndex = 402;
+    map.createPane('pane_Highlight');
+    map.getPane('pane_Highlight').style.zIndex = 605; // 高於 cluster icon，highlight 不會被蓋住
+
+    var cluster = L.markerClusterGroup({ showCoverageOnHover: false, spiderfyDistanceMultiplier: 2 });
+
+    // ---------- markers ----------
+    var layerByPhotoId = {};
+    var selectedLayer = null;
+    var hlMarker = null;
+    // 紅點由 2mm（radius 5px）放大為 5mm（radius 12px，2.5 倍）
+    var baseStyle = { radius: 12, color: 'rgba(35,35,35,1)', weight: 1, fill: true,
+                      fillColor: 'rgba(227,26,28,1)', fillOpacity: 1, pane: 'pane_Photos' };
+    var hlStyle = { radius: 18, color: '#f4d03f', weight: 3,
+                    fillColor: 'rgba(26,82,118,1)', fillOpacity: 1 };
+
+    function makeMarker(feature) {
+        var latlng = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
+        var m = L.circleMarker(latlng, Object.assign({}, baseStyle));
+        m._feature = feature;
+        m.on('click', function () { selectMarker(m); });
+        return m;
+    }
+    FEATURES.forEach(function (f) {
+        var m = makeMarker(f);
+        layerByPhotoId[f.properties['Photo ID']] = m;
+    });
+
+    // ---------- filters ----------
+    var checks = {};
+    var groupsEl = document.getElementById('filter-groups');
+
+    FILTER_FIELDS.forEach(function (field) {
+        var counts = {};
+        FEATURES.forEach(function (f) {
+            var v = f.properties[field];
+            if (v == null || String(v).trim() === '') { v = '(未填)'; }
+            counts[v] = (counts[v] || 0) + 1;
+        });
+        var values = Object.keys(counts).sort(function (a, b) { return a.localeCompare(b, 'zh-Hant'); });
+
+        var g = document.createElement('div');
+        g.className = 'filter-group';
+        var head = document.createElement('div');
+        head.className = 'filter-head';
+        head.innerHTML = '<span class="name">' + field + '</span>' +
+            '<span class="btns"><button data-act="all">Select all</button>' +
+            '<button data-act="clear">Clear</button></span>';
+        g.appendChild(head);
+
+        var opts = document.createElement('div');
+        opts.className = 'filter-options';
+        checks[field] = {};
+        values.forEach(function (v) {
+            var lab = document.createElement('label');
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = true;
+            cb.value = v;
+            checks[field][v] = cb;
+            lab.appendChild(cb);
+            lab.appendChild(document.createTextNode(v));
+            var c = document.createElement('span');
+            c.className = 'opt-count';
+            c.textContent = '(' + counts[v] + ')';
+            lab.appendChild(c);
+            cb.addEventListener('change', applyFilters);
+            opts.appendChild(lab);
+        });
+        g.appendChild(opts);
+
+        head.querySelector('[data-act="all"]').addEventListener('click', function () {
+            values.forEach(function (v) { checks[field][v].checked = true; });
+            applyFilters();
+        });
+        head.querySelector('[data-act="clear"]').addEventListener('click', function () {
+            values.forEach(function (v) { checks[field][v].checked = false; });
+            applyFilters();
+        });
+        groupsEl.appendChild(g);
+    });
+
+    // ---------- raster layer toggle（1992 Map）----------
+    (function buildLayerToggle() {
+        var g = document.createElement('div');
+        g.className = 'filter-group';
+        var head = document.createElement('div');
+        head.className = 'filter-head';
+        head.innerHTML = '<span class="name">Raster 圖層</span>';
+        g.appendChild(head);
+
+        var box = document.createElement('div');
+        box.className = 'layer-toggle';
+
+        // iB5000 Map：固定顯示，不可關閉
+        var fixed = document.createElement('div');
+        fixed.className = 'layer-fixed';
+        fixed.innerHTML = '<span class="pin"></span>iB5000 Map（固定顯示）';
+        box.appendChild(fixed);
+
+        // 1992 Map：可開關
+        var lab = document.createElement('label');
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = 'toggle-1992';
+        cb.checked = true;
+        cb.addEventListener('change', function () {
+            if (cb.checked) { map.addLayer(layer_1992Map); }
+            else { map.removeLayer(layer_1992Map); }
+        });
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode('1992 Map（點擊顯示 / 隱藏）'));
+        box.appendChild(lab);
+
+        g.appendChild(box);
+        groupsEl.appendChild(g);
+    })();
+
+    function visibleFeatures() {
+        return FEATURES.filter(function (f) {
+            return FILTER_FIELDS.every(function (field) {
+                var any = false;
+                var v = f.properties[field];
+                if (v == null || String(v).trim() === '') { v = '(未填)'; }
+                for (var val in checks[field]) {
+                    if (checks[field][val].checked && val === v) { any = true; break; }
+                }
+                return any;
+            });
+        });
+    }
+
+    var countEl = document.getElementById('record-count');
+    function applyFilters() {
+        if (selectedLayer) { deselect(); }
+        cluster.clearLayers();
+        var vis = visibleFeatures();
+        var layers = vis.map(function (f) { return layerByPhotoId[f.properties['Photo ID']]; });
+        cluster.addLayers(layers);
+        countEl.textContent = '顯示 ' + vis.length + ' / ' + FEATURES.length + ' 筆';
+    }
+    cluster.addTo(map);
+    applyFilters();
+
+    // ---------- detail panel ----------
+    var phEl = document.getElementById('detail-placeholder');
+    var bodyEl = document.getElementById('detail-body');
+    var imgEl = document.getElementById('detail-photo');
+    var metaEl = document.getElementById('detail-meta');
+
+    function deselect() {
+        if (selectedLayer) { selectedLayer.setStyle(baseStyle); selectedLayer = null; }
+        if (hlMarker) { map.removeLayer(hlMarker); hlMarker = null; }
+    }
+    function selectMarker(m) {
+        deselect();
+        selectedLayer = m;
+        m.setStyle(hlStyle);
+        m.bringToFront();
+        // 獨立 highlight 圓圈：即使 marker 被 cluster 收合也能清楚看到選取位置
+        hlMarker = L.circleMarker(m.getLatLng(), {
+            radius: 14, color: '#f4d03f', weight: 3, opacity: 1,
+            fillColor: 'rgba(26,82,118,0.45)', fillOpacity: 0.6,
+            pane: 'pane_Highlight', interactive: false
+        }).addTo(map);
+        // 縮放太小時平移放大，讓選取位置更清楚
+        if (map.getZoom() < 16) {
+            map.setView(m.getLatLng(), 16, { animate: false });
+        } else {
+            map.panTo(m.getLatLng(), { animate: false });
+        }
+        var f = m._feature, p = f.properties;
+        phEl.style.display = 'none';
+        bodyEl.style.display = '';
+        imgEl.style.display = '';
+        imgEl.onerror = function () { imgEl.style.display = 'none'; };
+        imgEl.src = photoFile(p['Photo Path']);
+        imgEl.alt = p['Photo ID'] || 'photo';
+        metaEl.innerHTML = FIELDS.map(function (k) {
+            return '<tr><th scope="row">' + k + '</th><td></td></tr>';
+        }).join('');
+        var tds = metaEl.querySelectorAll('td');
+        FIELDS.forEach(function (k, i) {
+            var v = p[k];
+            tds[i].textContent = (v == null || String(v).trim() === '') ? '—' : v;
+        });
+        document.getElementById('detail').scrollTop = 0;
+    }
+
+    // ---------- URL params（automated testing hooks）----------
+    // ?photo=B15P05  -> select a marker
+    // ?place=...     -> pre-set attribute filters (comma-separated)
+    // ?n1992=1       -> hide 1992 Map (simulate unchecking the toggle)
+    var params = new URLSearchParams(location.search);
+    ['Place', 'Subject', 'Location precision'].forEach(function (field, idx) {
+        var key = ['place', 'subject', 'precision'][idx];
+        if (params.has(key)) {
+            var want = params.get(key).split(',');
+            for (var v in checks[field]) {
+                checks[field][v].checked = want.indexOf(v) !== -1;
+            }
+        }
+    });
+    if (params.has('place') || params.has('subject') || params.has('precision')) {
+        applyFilters();
+    }
+    if (params.has('n1992')) {
+        var t = document.getElementById('toggle-1992');
+        t.checked = false;
+        map.removeLayer(layer_1992Map);
+    }
+    if (params.has('photo')) {
+        var target = layerByPhotoId[params.get('photo')];
+        if (target) { selectMarker(target); }
+    }
+})();
+</script>
+</body>
+</html>
